@@ -1,0 +1,17 @@
+{
+  "name": "city3d-client",
+  "version": "1.0.0",
+  "description": "Three.js WebGL 3D city visualisation client",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.159.0"
+  },
+  "devDependencies": {
+    "vite": "^8.0.8"
+  }
+}
