@@ -6,7 +6,7 @@
  *
  *   LOD 0 – Near  (0–200 m)   Full extrusion, individual meshes
  *   LOD 1 – Mid   (200–600 m) Simple box, merged by material
- *   LOD 2 – Far   (600+ m)    Flat footprint (height = 0), instanced
+ *   LOD 2 – Far   (600+ m)    Flat footprint (height = 0), instancedd
  *
  * In this implementation the building geometry is fixed at load time;
  * the LOD manager controls *visibility* of pre-built near/mid/far
