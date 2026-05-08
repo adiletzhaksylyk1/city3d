@@ -39,7 +39,6 @@ FROM (
     ) AS feature
   FROM streets s
   WHERE s.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-    AND ST_Intersects(s.geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))
 ) f
 `;
 

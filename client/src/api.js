@@ -10,7 +10,7 @@ const API_BASE = "/api";
 const GEOJSON_PATH = "/city.geojson";   // served from client/public/
 
 let _sourceMode = "geojson";            // default: use local file
-let _lodFilter  = null;                 // null = no filter
+let _lodFilter = 2;                 // null = no filter
 
 /** Set data source: "geojson" | "api" */
 export function setSourceMode(mode) {
@@ -59,7 +59,7 @@ async function fetchFromApi(endpoint, bbox) {
   if (_lodFilter !== null) params.set("lod", String(_lodFilter));
 
   const url = `${API_BASE}/${endpoint}?${params}`;
-  const res  = await fetch(url);
+  const res = await fetch(url);
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
@@ -73,7 +73,7 @@ export async function fetchExtent() {
   if (_sourceMode === "geojson") {
     // Compute extent from the GeoJSON file
     const geojson = await loadGeojsonFile();
-    const coords  = [];
+    const coords = [];
 
     for (const f of geojson.features || []) {
       const geom = f.geometry;
@@ -96,7 +96,7 @@ export async function fetchExtent() {
     const minLat = Math.min(...lats), maxLat = Math.max(...lats);
 
     return {
-      bbox:   [minLon, minLat, maxLon, maxLat],
+      bbox: [minLon, minLat, maxLon, maxLat],
       center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
     };
   }

@@ -15,7 +15,7 @@
  */
 
 import * as THREE from "three";
-import { BufferGeometryUtils } from "three/addons/utils/BufferGeometryUtils.js";
+import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { lonLatToScene } from "./geo.js";
 
 // ── Colour helpers ────────────────────────────────────────────────────────────

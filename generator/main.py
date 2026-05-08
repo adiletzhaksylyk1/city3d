@@ -24,16 +24,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--grid",        type=int,   default=12,    help="Street grid density")
     p.add_argument("--no-diagonals",action="store_true",       help="Disable diagonal streets")
 
-    p.add_argument("--write-db",    action="store_true",       help="Write city to PostGIS")
+    p.add_argument("--no-db",    action="store_true",       help="Write city to PostGIS")
     p.add_argument("--no-viewer",   action="store_true",       help="Skip 3D viewer (headless)")
     p.add_argument("--screenshot",  default=None,              help="Save screenshot PNG")
-    p.add_argument("--geojson",     default="output/city.geojson",
+    p.add_argument("--geojson",     default="../client/public/city.geojson",
                    help="Path for GeoJSON export")
 
     p.add_argument("--db-host",     default="localhost")
     p.add_argument("--db-port",     type=int, default=5432)
     p.add_argument("--db-name",     default="city3d")
-    p.add_argument("--db-user",     default="postgres")
+    p.add_argument("--db-user",     default="postgres") 
     p.add_argument("--db-password", default="postgres")
 
     return p.parse_args()
@@ -85,7 +85,7 @@ def main() -> None:
     except Exception as e:
         print(f"[main] GeoJSON export failed: {e}")
 
-    if args.write_db:
+    if not args.no_db:
         from db_writer import write_city_to_db
         write_city_to_db(cfg, buildings, streets, lod_config)
 

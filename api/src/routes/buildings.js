@@ -31,7 +31,6 @@ FROM (
     ) AS feature
   FROM buildings b
   WHERE b.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-    AND ST_Intersects(b.geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))
 ) f
 `;
 
@@ -60,7 +59,6 @@ FROM (
     ) AS feature
   FROM buildings b
   WHERE b.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-    AND ST_Intersects(b.geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))
     AND b.lod_level = $5
 ) f
 `;
