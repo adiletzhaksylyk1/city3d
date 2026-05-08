@@ -38,6 +38,7 @@ services:
       DB_NAME:     city3d
       DB_USER:     postgres
       DB_PASSWORD: postgres
+      DB_URL:      postgresql://postgres:postgres@postgres:5432/city3d
       PORT:        3000
       NODE_ENV:    production
     ports:

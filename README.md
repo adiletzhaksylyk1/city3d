@@ -36,8 +36,7 @@ city3d/
 │   └── .env.example
 │
 ├── client/             # Layer 4 — Three.js browser client
-│   ├── public/
-│   │   └── index.html
+│   ├── index.html
 │   ├── src/
 │   │   ├── main.js         ← Entry point
 │   │   ├── scene.js        ← Three.js scene setup
@@ -63,6 +62,9 @@ docker-compose up -d postgres
 ### 2. Apply schema
 ```bash
 psql $DATABASE_URL -f database/schema.sql
+
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/city3d"
+psql $env:DATABASE_URL -f database/schema.sql
 ```
 
 ### 3. Generate a synthetic city

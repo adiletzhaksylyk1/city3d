@@ -135,13 +135,23 @@ def visualize_and_export(
     mesh: pv.PolyData,
     location: str,
     lod_config: LODConfig,
+    buildings_gdf: gpd.GeoDataFrame, # Pass the GDF here to export it
+    streets_list: List,              # Pass the streets here
     street_mesh: Optional[pv.PolyData] = None,
     screenshot: Optional[str] = None,
     off_screen: bool = False,
 ) -> None:
-    out = Path("output")
-    out.mkdir(exist_ok=True)
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    export_path = BASE_DIR / "client/public/city.geojson"
+    
+    export_geojson(
+        buildings=buildings_gdf,
+        streets=streets_list,
+        output_path=str(export_path),
+        lod_config=lod_config
+    )
 
+    # 2. Show the PyVista window
     visualize_mesh(
         mesh=mesh,
         location=location,
