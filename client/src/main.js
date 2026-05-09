@@ -42,11 +42,9 @@ import {
   renderBuildings,
   renderStreets,
   pickBuilding,
-  disposeMaterials,
 } from "./renderer.js";
 
 import {
-  LODManager,
   applySceneLOD,
   LOD_TIER_LABELS,
 } from "./lod.js";
@@ -78,8 +76,6 @@ const btnApi      = document.getElementById("btn-api");
 
 let buildingCount = 0;
 let streetCount   = 0;
-let lodManager    = null;
-let lastBbox      = null;
 let isLoading     = false;
 
 // FPS tracking
@@ -101,8 +97,6 @@ const controls = createControls(camera, renderer);
 
 createLights(scene);
 createGround(scene);
-
-lodManager = new LODManager(camera);
 
 // ── Raycasting ────────────────────────────────────────────────────────────────
 
@@ -167,14 +161,11 @@ async function refreshCity() {
       fetchStreets(bboxStr),
     ]);
 
-    lodManager.clear();
-
     const { count: bc } = renderBuildings(buildingsGJ, scene);
     const { count: sc } = renderStreets(streetsGJ, scene);
 
     buildingCount = bc;
     streetCount   = sc;
-    lastBbox      = bbox;
 
     statBuildings.textContent = bc;
     statStreets.textContent   = sc;
@@ -200,18 +191,15 @@ function checkIncrementalLoad() {
 
 // ── Render loop (Section 5.7) ─────────────────────────────────────────────────
 
-const clock = new THREE.Clock();
-
 function animate() {
   requestAnimationFrame(animate);
 
   // Controls damping
   controls.update();
 
-  // LOD
-  const buildingMesh = scene.getObjectByName("buildings");
-  applySceneLOD(buildingMesh, camera);
-  const tier = lodManager.update();
+  // LOD — use orbit controls target as the reference point
+  const buildingGroup = scene.getObjectByName("buildings");
+  const tier = applySceneLOD(buildingGroup, camera, controls.target);
   statLod.textContent = LOD_TIER_LABELS[tier] ?? "—";
 
   // Incremental load check
@@ -238,7 +226,6 @@ window.addEventListener("resize", () => onResize(camera, renderer, container));
 // LOD selector
 lodSelect.addEventListener("change", () => {
   setLodFilter(lodSelect.value || null);
-  lastBbox = null;   // force refresh
   refreshCity().catch(console.error);
 });
 

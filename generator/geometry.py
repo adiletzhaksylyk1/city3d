@@ -7,6 +7,19 @@ from typing import Dict, List, Tuple
 from config import LODConfig
 
 
+def parse_height_raw(raw, default: float = 12.0) -> float:
+    """Parse a raw height value (e.g. '15.0m', '20', None) into a float.
+
+    Shared utility used by both GeoJSON export and DB writer to avoid
+    duplicating the same parsing logic.
+    """
+    if raw is None:
+        return default
+    try:
+        return float(str(raw).lower().replace("m", "").strip())
+    except (ValueError, TypeError, AttributeError):
+        return default
+
 def get_building_height(
     data: Dict,
     lod_config: LODConfig,

@@ -10,7 +10,7 @@ const API_BASE = "/api";
 const GEOJSON_PATH = "/city.geojson";   // served from client/public/
 
 let _sourceMode = "geojson";            // default: use local file
-let _lodFilter = 2;                 // null = no filter
+let _lodFilter = null;               // null = no filter (show all levels)
 
 /** Set data source: "geojson" | "api" */
 export function setSourceMode(mode) {

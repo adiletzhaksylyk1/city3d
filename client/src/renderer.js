@@ -59,18 +59,17 @@ function getMaterial(color, type = "building") {
   if (_matCache.has(key)) return _matCache.get(key);
 
   let mat;
-  if (type === "building") {
-    mat = new THREE.MeshLambertMaterial({
-      color,
-      side: THREE.FrontSide,
-    });
-  } else {
-    // Glass-like treatment for tall buildings
+  if (type === "glass") {
     mat = new THREE.MeshLambertMaterial({
       color,
       transparent: true,
       opacity: 0.85,
       side: THREE.DoubleSide,
+    });
+  } else {
+    mat = new THREE.MeshLambertMaterial({
+      color,
+      side: THREE.FrontSide,
     });
   }
 
@@ -108,14 +107,11 @@ function ringToShape(ring) {
  * @returns {number} height in scene units (metres)
  */
 function resolveHeight(props) {
-  // Explicit height
   if (props.height && props.height > 0) return props.height;
-  // Infer from floors
   if (props.floors && props.floors > 0) return props.floors * 3.0;
-  // building:levels (OSM tag)
   const lv = props["building:levels"];
   if (lv && lv > 0) return parseFloat(lv) * 3.0;
-  return 12.0;   // default
+  return 12.0;
 }
 
 const EXTRUDE_SETTINGS_BASE = {
@@ -138,14 +134,19 @@ export function renderBuildings(featureCollection, scene) {
   // Remove old buildings group if present
   const old = scene.getObjectByName("buildings");
   if (old) {
-    old.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } });
+    old.traverse((o) => {
+      if (o.isMesh) {
+        o.geometry.dispose();
+        // Materials are cached and shared — don't dispose here
+      }
+    });
     scene.remove(old);
   }
 
   const group = new THREE.Group();
   group.name  = "buildings";
 
-  /** @type {Map<string, { geos: THREE.BufferGeometry[], color: THREE.Color, isGlass: boolean }>} */
+  /** @type {Map<string, { geos: THREE.BufferGeometry[], color: THREE.Color, isGlass: boolean, features: object[] }>} */
   const batches = new Map();
   const centres = [];
 
@@ -162,10 +163,7 @@ export function renderBuildings(featureCollection, scene) {
     const color  = resolveColor(props);
     const isGlass = (props.material === "glass" && height > 30);
 
-    // Build a Shape from the coordinate ring
     const shape = ringToShape(ring);
-
-    // Extrude: depth = height, rotate X so extrusion goes up (Y axis)
     const extrudeSettings = { ...EXTRUDE_SETTINGS_BASE, depth: height };
     const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
 
@@ -175,9 +173,11 @@ export function renderBuildings(featureCollection, scene) {
     // Batch key
     const key = `${isGlass ? "glass" : "solid"}:${color.getHexString()}`;
     if (!batches.has(key)) {
-      batches.set(key, { geos: [], color, isGlass });
+      batches.set(key, { geos: [], color, isGlass, features: [] });
     }
-    batches.get(key).geos.push(geo);
+    const batch = batches.get(key);
+    batch.geos.push(geo);
+    batch.features.push(feature);
 
     // Record building centre for LOD / raycasting
     geo.computeBoundingBox();
@@ -189,7 +189,7 @@ export function renderBuildings(featureCollection, scene) {
   }
 
   // Merge each batch into a single mesh
-  for (const [, { geos, color, isGlass }] of batches) {
+  for (const [, { geos, color, isGlass, features }] of batches) {
     if (!geos.length) continue;
 
     const merged = geos.length > 1
@@ -202,8 +202,8 @@ export function renderBuildings(featureCollection, scene) {
     mesh.receiveShadow = true;
     mesh.name = "building-batch";
 
-    // Store feature properties for raycasting info panel
-    mesh.userData.features = featureCollection.features;
+    // Store only this batch's features for raycasting (not the entire collection)
+    mesh.userData.features = features;
 
     group.add(mesh);
 
@@ -226,6 +226,18 @@ const STREET_COLORS = {
   residential: new THREE.Color(0xAAAAAA),   // light grey
 };
 
+/** Street material cache — reuse materials across features and refreshes */
+const _streetMatCache = new Map();
+
+function getStreetMaterial(color) {
+  const key = color.getHexString();
+  if (_streetMatCache.has(key)) return _streetMatCache.get(key);
+
+  const mat = new THREE.LineBasicMaterial({ color, linewidth: 1 });
+  _streetMatCache.set(key, mat);
+  return mat;
+}
+
 /**
  * Render street LineString features into a Three.js Group.
  *
@@ -236,7 +248,10 @@ const STREET_COLORS = {
 export function renderStreets(featureCollection, scene) {
   const old = scene.getObjectByName("streets");
   if (old) {
-    old.traverse((o) => { if (o.isLine) o.geometry.dispose(); });
+    old.traverse((o) => {
+      if (o.isLine) o.geometry.dispose();
+      // Materials are cached — don't dispose here
+    });
     scene.remove(old);
   }
 
@@ -261,7 +276,7 @@ export function renderStreets(featureCollection, scene) {
     if (points.length < 2) continue;
 
     const geo  = new THREE.BufferGeometry().setFromPoints(points);
-    const mat  = new THREE.LineBasicMaterial({ color, linewidth: 1 });
+    const mat  = getStreetMaterial(color);
     const line = new THREE.Line(geo, mat);
     line.name  = "street";
 
@@ -295,7 +310,7 @@ export function pickBuilding(raycaster, scene) {
   const hits = raycaster.intersectObjects(meshes, false);
   if (!hits.length) return null;
 
-  // The hit mesh stores feature data in userData
+  // The hit mesh stores its own batch's feature data in userData
   const hit = hits[0];
   const features = hit.object.userData.features;
   if (!features) return null;

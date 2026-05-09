@@ -54,7 +54,3 @@ def create_street_mesh(
 
     return _linestrings_to_polydata(streets)
 
-
-def streetGraph_to_pyvista(streets: List[LineString]) -> pv.PolyData:
-    """Alias kept for backward compatibility."""
-    return _linestrings_to_polydata(streets)

@@ -5,8 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+    "dev": "nodemon src/index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

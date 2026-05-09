@@ -49,16 +49,6 @@ export function lonLatToScene(lon, lat) {
   return { x, z };
 }
 
-/**
- * Convert a GeoJSON Polygon ring (array of [lon, lat] pairs) to a
- * flat array of Three.js {x, z} objects.
- *
- * @param {Array<[number, number]>} ring
- * @returns {Array<{x: number, z: number}>}
- */
-export function ringToScene(ring) {
-  return ring.map(([lon, lat]) => lonLatToScene(lon, lat));
-}
 
 /**
  * Compute a bounding box in WGS84 from the current Three.js camera position.

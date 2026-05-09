@@ -10,6 +10,7 @@ from psycopg2.extras import execute_batch
 from shapely.geometry import Polygon, LineString
 
 from config import GeneratorConfig, LODConfig
+from geometry import parse_height_raw
 
 
 def _polygon_to_wkt(poly: Polygon) -> str:
@@ -107,11 +108,7 @@ def insert_buildings(
             continue
 
         # Parse height
-        height_raw = row.get("height", None)
-        try:
-            height = float(str(height_raw).lower().replace("m", "").strip())
-        except (ValueError, TypeError, AttributeError):
-            height = 12.0
+        height = parse_height_raw(row.get("height", None))
 
         material      = str(row.get("building:material", "concrete") or "concrete")
         color         = str(row.get("building:colour",  "#CCCCCC")   or "#CCCCCC")

@@ -4,13 +4,12 @@ import json
 from pathlib import Path
 from typing import List, Optional, Dict
 
-import numpy as np
 import pyvista as pv
 import geopandas as gpd
 from shapely.geometry import mapping
 
-from config import LODConfig, GeneratorConfig
-from geometry import get_building_height, get_building_color
+from config import LODConfig
+from geometry import parse_height_raw
 
 
 
@@ -83,11 +82,7 @@ def export_geojson(
             "lod_level": lod_config.lod_level,
         }
 
-        raw = row.get("height", None)
-        try:
-            props["height"] = float(str(raw).lower().replace("m", "").strip())
-        except (ValueError, TypeError, AttributeError):
-            props["height"] = 12.0
+        props["height"] = parse_height_raw(row.get("height", None))
 
         for key in [
             "building:levels",
@@ -128,35 +123,3 @@ def export_geojson(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(collection, indent=2))
     print(f"[viz] GeoJSON exported: {out} ({len(features)} features)")
-
-
-
-def visualize_and_export(
-    mesh: pv.PolyData,
-    location: str,
-    lod_config: LODConfig,
-    buildings_gdf: gpd.GeoDataFrame, # Pass the GDF here to export it
-    streets_list: List,              # Pass the streets here
-    street_mesh: Optional[pv.PolyData] = None,
-    screenshot: Optional[str] = None,
-    off_screen: bool = False,
-) -> None:
-    BASE_DIR = Path(__file__).resolve().parent.parent
-    export_path = BASE_DIR / "client/public/city.geojson"
-    
-    export_geojson(
-        buildings=buildings_gdf,
-        streets=streets_list,
-        output_path=str(export_path),
-        lod_config=lod_config
-    )
-
-    # 2. Show the PyVista window
-    visualize_mesh(
-        mesh=mesh,
-        location=location,
-        lod_config=lod_config,
-        street_mesh=street_mesh,
-        screenshot=screenshot,
-        off_screen=off_screen,
-    )

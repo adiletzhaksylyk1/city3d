@@ -27,17 +27,13 @@ pool.on("error", (err) => {
 
 /**
  * Execute a parameterised SQL query.
+ * Uses pool.query() which handles connection checkout/release automatically.
  * @param {string} sql
  * @param {Array}  params
  * @returns {Promise<pg.QueryResult>}
  */
 async function query(sql, params = []) {
-  const client = await pool.connect();
-  try {
-    return await client.query(sql, params);
-  } finally {
-    client.release();
-  }
+  return pool.query(sql, params);
 }
 
 module.exports = { pool, query };

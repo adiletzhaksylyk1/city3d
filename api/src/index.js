@@ -102,9 +102,25 @@ app.use((err, req, res, _next) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[api] 3D City API listening on http://localhost:${PORT}`);
   console.log(`[api] Database: ${process.env.DB_HOST || "localhost"}:${process.env.DB_PORT || 5432}/${process.env.DB_NAME || "city3d"}`);
 });
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+function shutdown(signal) {
+  console.log(`[api] ${signal} received — shutting down…`);
+  server.close(() => {
+    pool.end().then(() => {
+      console.log("[api] Database pool closed.");
+      process.exit(0);
+    });
+  });
+  // Force exit after 10s if graceful shutdown stalls
+  setTimeout(() => process.exit(1), 10_000);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT",  () => shutdown("SIGINT"));
 
 module.exports = app;

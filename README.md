@@ -20,8 +20,7 @@ city3d/
 │
 ├── database/           # Layer 2 — PostGIS schema & helpers
 │   ├── schema.sql          ← CREATE TABLE + indexes
-│   ├── queries.sql         ← Viewport bbox queries
-│   └── seed.sql            ← Optional test data
+│   └── queries.sql         ← Viewport bbox queries
 │
 ├── api/                # Layer 3 — Node.js Express GeoJSON API
 │   ├── src/
@@ -87,7 +86,7 @@ npm start
 cd client
 npm install
 npm run dev
-```np
+```
 Then open http://localhost:5173
 
 ## LOD Levels

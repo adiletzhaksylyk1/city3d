@@ -1,3 +1,11 @@
+/**
+ * buildings.js — /api/buildings routes
+ *
+ * GET /api/buildings?bbox=minLon,minLat,maxLon,maxLat[&lod=0-4]
+ * GET /api/buildings/extent
+ * GET /api/buildings/count?bbox=...
+ */
+
 "use strict";
 
 const { Router } = require("express");
@@ -6,7 +14,17 @@ const { validateBbox, validateLod } = require("../middleware/validate");
 
 const router = Router();
 
-const BUILDINGS_SQL = `
+// ── SQL ───────────────────────────────────────────────────────────────────────
+
+/**
+ * Build the buildings viewport query with optional LOD filter.
+ * Eliminates the previous duplication of two nearly-identical SQL strings.
+ *
+ * @param {boolean} withLod  Whether to add a lod_level filter clause
+ * @returns {string} Parameterised SQL
+ */
+function buildBuildingsSQL(withLod) {
+  return `
 SELECT json_build_object(
   'type',     'FeatureCollection',
   'features', COALESCE(json_agg(f.feature ORDER BY f.id), '[]'::json)
@@ -31,51 +49,31 @@ FROM (
     ) AS feature
   FROM buildings b
   WHERE b.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+    ${withLod ? "AND b.lod_level = $5" : ""}
 ) f
 `;
+}
 
-const BUILDINGS_LOD_SQL = `
-SELECT json_build_object(
-  'type',     'FeatureCollection',
-  'features', COALESCE(json_agg(f.feature ORDER BY f.id), '[]'::json)
-) AS geojson
-FROM (
-  SELECT
-    b.id,
-    json_build_object(
-      'type',       'Feature',
-      'geometry',   ST_AsGeoJSON(b.geom)::json,
-      'properties', json_build_object(
-        'id',            b.id,
-        'height',        b.height,
-        'floors',        b.floors,
-        'material',      b.material,
-        'color',         b.color,
-        'building_type', b.building_type,
-        'roof_shape',    b.roof_shape,
-        'lod_level',     b.lod_level,
-        'name',          b.name
-      )
-    ) AS feature
-  FROM buildings b
-  WHERE b.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-    AND b.lod_level = $5
-) f
-`;
+const BUILDINGS_SQL     = buildBuildingsSQL(false);
+const BUILDINGS_LOD_SQL = buildBuildingsSQL(true);
 
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/buildings
+ * Returns GeoJSON FeatureCollection of buildings within the viewport.
+ */
 router.get("/", validateBbox, validateLod, async (req, res) => {
   const { minLon, minLat, maxLon, maxLat } = req.bbox;
   const t0 = Date.now();
 
   try {
-    let result;
+    const params = [minLon, minLat, maxLon, maxLat];
+    const sql = req.lod !== null
+      ? (params.push(req.lod), BUILDINGS_LOD_SQL)
+      : BUILDINGS_SQL;
 
-    if (req.lod !== null) {
-      result = await query(BUILDINGS_LOD_SQL, [minLon, minLat, maxLon, maxLat, req.lod]);
-    } else {
-      result = await query(BUILDINGS_SQL, [minLon, minLat, maxLon, maxLat]);
-    }
-
+    const result  = await query(sql, params);
     const geojson = result.rows[0].geojson;
     const count   = geojson.features ? geojson.features.length : 0;
 
@@ -100,7 +98,7 @@ router.get("/", validateBbox, validateLod, async (req, res) => {
  * Returns the bounding box + centre of all buildings in the database.
  * Used by the Three.js client to set the initial camera position.
  */
-router.get("/extent", async (req, res) => {
+router.get("/extent", async (_req, res) => {
   const sql = `
     SELECT
       ST_XMin(e) AS min_lon,

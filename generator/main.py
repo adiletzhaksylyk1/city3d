@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import argparse
-import sys
-from pathlib import Path
 
-from config import GeneratorConfig, LODConfig
+from config import GeneratorConfig
 from city_generator import generate_synthetic_city
 from building_processing import generate_footprints, filter_by_lod
 from mesh_builder import extrude_buildings
@@ -24,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--grid",        type=int,   default=12,    help="Street grid density")
     p.add_argument("--no-diagonals",action="store_true",       help="Disable diagonal streets")
 
-    p.add_argument("--no-db",    action="store_true",       help="Write city to PostGIS")
+    p.add_argument("--no-db",    action="store_true",       help="Skip writing city to PostGIS")
     p.add_argument("--no-viewer",   action="store_true",       help="Skip 3D viewer (headless)")
     p.add_argument("--screenshot",  default=None,              help="Save screenshot PNG")
     p.add_argument("--geojson",     default="../client/public/city.geojson",
@@ -72,19 +70,16 @@ def main() -> None:
     street_mesh = create_street_mesh(streets, lod_config)
     print(f"[main] Mesh: {mesh.n_cells} cells, {mesh.n_points} points")
 
+    # GeoJSON export (reproject to WGS84 for browser consumption)
     try:
-        buildings_wgs = buildings.to_crs("EPSG:4326")
-        import geopandas as gpd
-        from shapely.geometry import LineString
-        streets_wgs = list(
-            gpd.GeoDataFrame(geometry=streets, crs="EPSG:2154")
-            .to_crs("EPSG:4326")
-            .geometry
-        )
+        from db_writer import _reproject_buildings, _reproject_lines
+        buildings_wgs = _reproject_buildings(buildings)
+        streets_wgs   = _reproject_lines(streets)
         export_geojson(buildings_wgs, streets_wgs, args.geojson, lod_config)
     except Exception as e:
         print(f"[main] GeoJSON export failed: {e}")
 
+    # Database write (unless --no-db)
     if not args.no_db:
         from db_writer import write_city_to_db
         write_city_to_db(cfg, buildings, streets, lod_config)
