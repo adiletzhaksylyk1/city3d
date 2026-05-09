@@ -59,17 +59,62 @@ export function applySceneLOD(buildingMesh, camera, target) {
 
   const tier = computeSceneTier(camera, target);
 
-  // Adjust shadow quality based on distance tier
+  // Map tier to the target data LOD level
+  let targetDataLod = 2; // Default to standard
+  if (tier === LOD_NEAR) targetDataLod = 4;
+  else if (tier === LOD_MID) targetDataLod = 2;
+  else if (tier === LOD_FAR) targetDataLod = 0;
+
+  // We need to find the available LOD levels in the mesh
+  const availableLods = new Set();
+  if (buildingMesh.isGroup) {
+    buildingMesh.traverse((child) => {
+      if (child.isMesh && child.userData.lodLevel !== undefined) {
+        availableLods.add(child.userData.lodLevel);
+      }
+    });
+  }
+
+  // If the exact targetDataLod is not available, find the closest one
+  let activeDataLod = targetDataLod;
+  if (availableLods.size > 0 && !availableLods.has(targetDataLod)) {
+    let minDiff = Infinity;
+    for (const lod of availableLods) {
+      const diff = Math.abs(lod - targetDataLod);
+      if (diff < minDiff) {
+        minDiff = diff;
+        activeDataLod = lod;
+      }
+    }
+  }
+
+  // Adjust visibility and shadows
   if (buildingMesh.isGroup) {
     buildingMesh.traverse((child) => {
       if (child.isMesh) {
-        child.castShadow    = tier === LOD_NEAR;
-        child.receiveShadow = tier <= LOD_MID;
+        // Toggle visibility based on activeDataLod
+        if (child.userData.lodLevel !== undefined) {
+          child.visible = (child.userData.lodLevel === activeDataLod);
+        } else {
+          child.visible = true; // no lodLevel -> always visible
+        }
+
+        // Only adjust shadows for visible meshes to save performance
+        if (child.visible) {
+          child.castShadow    = tier === LOD_NEAR;
+          child.receiveShadow = tier <= LOD_MID;
+        }
       }
     });
   } else {
     buildingMesh.castShadow    = tier === LOD_NEAR;
     buildingMesh.receiveShadow = tier <= LOD_MID;
+  }
+
+  // Debug logging for LOD selection changes
+  if (buildingMesh.userData._lastActiveLod !== activeDataLod) {
+    console.log(`[LOD] Distance tier: ${tier} -> Target LOD: ${targetDataLod} -> Active LOD: ${activeDataLod}`);
+    buildingMesh.userData._lastActiveLod = activeDataLod;
   }
 
   return tier;

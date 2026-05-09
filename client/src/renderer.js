@@ -146,7 +146,7 @@ export function renderBuildings(featureCollection, scene) {
   const group = new THREE.Group();
   group.name  = "buildings";
 
-  /** @type {Map<string, { geos: THREE.BufferGeometry[], color: THREE.Color, isGlass: boolean, features: object[] }>} */
+  /** @type {Map<string, { geos: THREE.BufferGeometry[], color: THREE.Color, isGlass: boolean, lodLevel: number, features: object[] }>} */
   const batches = new Map();
   const centres = [];
 
@@ -170,10 +170,11 @@ export function renderBuildings(featureCollection, scene) {
     // Three.js extrudes along Z; rotate so buildings go up the Y axis
     geo.rotateX(-Math.PI / 2);
 
+    const lodLevel = props.lod_level !== undefined ? props.lod_level : 2;
     // Batch key
-    const key = `${isGlass ? "glass" : "solid"}:${color.getHexString()}`;
+    const key = `LOD${lodLevel}:${isGlass ? "glass" : "solid"}:${color.getHexString()}`;
     if (!batches.has(key)) {
-      batches.set(key, { geos: [], color, isGlass, features: [] });
+      batches.set(key, { geos: [], color, isGlass, lodLevel, features: [] });
     }
     const batch = batches.get(key);
     batch.geos.push(geo);
@@ -189,7 +190,7 @@ export function renderBuildings(featureCollection, scene) {
   }
 
   // Merge each batch into a single mesh
-  for (const [, { geos, color, isGlass, features }] of batches) {
+  for (const [, { geos, color, isGlass, lodLevel, features }] of batches) {
     if (!geos.length) continue;
 
     const merged = geos.length > 1
@@ -204,6 +205,7 @@ export function renderBuildings(featureCollection, scene) {
 
     // Store only this batch's features for raycasting (not the entire collection)
     mesh.userData.features = features;
+    mesh.userData.lodLevel = lodLevel;
 
     group.add(mesh);
 

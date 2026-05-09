@@ -10,7 +10,7 @@ from psycopg2.extras import execute_batch
 from shapely.geometry import Polygon, LineString
 
 from config import GeneratorConfig, LODConfig
-from geometry import parse_height_raw
+from geometry import parse_height_raw, get_building_height, get_building_color, get_roof_shape
 
 
 def _polygon_to_wkt(poly: Polygon) -> str:
@@ -107,13 +107,22 @@ def insert_buildings(
         if geom is None or geom.is_empty:
             continue
 
-        # Parse height
-        height = parse_height_raw(row.get("height", None))
+        data = row.to_dict()
+        height = get_building_height(data, lod_config)
 
-        material      = str(row.get("building:material", "concrete") or "concrete")
-        color         = str(row.get("building:colour",  "#CCCCCC")   or "#CCCCCC")
-        building_type = str(row.get("building:type",    "residential") or "residential")
-        roof_shape    = str(row.get("roof:shape",       "flat")       or "flat")
+        if lod_config.use_materials:
+            material = str(data.get("building:material", "concrete") or "concrete")
+        else:
+            material = "concrete"
+
+        if lod_config.use_colors:
+            color_rgb = get_building_color(data, lod_config)
+            color = f"#{int(color_rgb[0]*255):02x}{int(color_rgb[1]*255):02x}{int(color_rgb[2]*255):02x}"
+        else:
+            color = "#CCCCCC"
+
+        building_type = str(data.get("building:type", "residential") or "residential")
+        roof_shape    = get_roof_shape(data, lod_config)
 
         rows.append((
             _polygon_to_wkt(geom),
@@ -184,7 +193,7 @@ def write_city_to_db(
     cfg: GeneratorConfig,
     buildings: gpd.GeoDataFrame,
     streets: List[LineString],
-    lod_config: LODConfig,
+    lod_configs: List[LODConfig],
 ) -> None:
     print(f"[db_writer] Connecting to {cfg.db_host}:{cfg.db_port}/{cfg.db_name} ...")
 
@@ -201,9 +210,14 @@ def write_city_to_db(
         buildings_wgs = _reproject_buildings(buildings)
         streets_wgs   = _reproject_lines(streets)
 
-        insert_buildings(conn, buildings_wgs, lod_config)
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE buildings, streets RESTART IDENTITY;")
+        conn.commit()
 
-        if lod_config.use_streets:
+        for lod_config in lod_configs:
+            insert_buildings(conn, buildings_wgs, lod_config)
+
+        if any(lc.use_streets for lc in lod_configs):
             insert_streets(conn, streets_wgs)
 
     except Exception as e:

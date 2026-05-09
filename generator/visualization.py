@@ -9,7 +9,7 @@ import geopandas as gpd
 from shapely.geometry import mapping
 
 from config import LODConfig
-from geometry import parse_height_raw
+from geometry import parse_height_raw, get_building_height, get_building_color, get_roof_shape, get_roof_height
 
 
 
@@ -66,53 +66,68 @@ def export_geojson(
     buildings: gpd.GeoDataFrame,
     streets: List,
     output_path: str,
-    lod_config: LODConfig,
+    lod_configs: List[LODConfig],
 ) -> None:
 
     features = []
 
+    for lod_config in lod_configs:
+        for _, row in buildings.iterrows():
+            geom = row.geometry
+            if geom is None or geom.is_empty:
+                continue
 
-    for _, row in buildings.iterrows():
-        geom = row.geometry
-        if geom is None or geom.is_empty:
-            continue
+            data = row.to_dict()
+            height = get_building_height(data, lod_config)
 
-        props: Dict = {
-            "type": "building",
-            "lod_level": lod_config.lod_level,
-        }
+            props: Dict = {
+                "type": "building",
+                "lod_level": lod_config.lod_level,
+                "height": height,
+            }
 
-        props["height"] = parse_height_raw(row.get("height", None))
+            if lod_config.use_levels:
+                props["building:levels"] = data.get("building:levels")
+            
+            if lod_config.use_materials:
+                props["building:material"] = data.get("building:material", "concrete")
+            else:
+                props["building:material"] = "concrete"
 
-        for key in [
-            "building:levels",
-            "building:material",
-            "building:colour",
-            "building:type",
-            "roof:shape",
-            "roof:height",
-        ]:
-            val = row.get(key, None)
-            if val is not None:
-                props[key] = val
+            if lod_config.use_colors:
+                color_rgb = get_building_color(data, lod_config)
+                props["building:colour"] = f"#{int(color_rgb[0]*255):02x}{int(color_rgb[1]*255):02x}{int(color_rgb[2]*255):02x}"
+            else:
+                props["building:colour"] = "#CCCCCC"
 
-        features.append({
-            "type": "Feature",
-            "geometry": mapping(geom),
-            "properties": props,
-        })
+            props["building:type"] = data.get("building:type", "residential")
 
-    for line in streets:
-        if line is None or line.is_empty:
-            continue
-        features.append({
-            "type": "Feature",
-            "geometry": mapping(line),
-            "properties": {
-                "type": "street",
-                "street_type": "residential",
-            },
-        })
+            if lod_config.use_roof_shapes:
+                props["roof:shape"] = get_roof_shape(data, lod_config)
+                props["roof:height"] = get_roof_height(data, lod_config)
+            else:
+                props["roof:shape"] = "flat"
+                props["roof:height"] = 0.0
+
+            features.append({
+                "type": "Feature",
+                "geometry": mapping(geom),
+                "properties": props,
+            })
+
+    # Add streets if any config requires it (LOD >= 4)
+    if any(lc.use_streets for lc in lod_configs):
+        for line in streets:
+            if line is None or line.is_empty:
+                continue
+            features.append({
+                "type": "Feature",
+                "geometry": mapping(line),
+                "properties": {
+                    "type": "street",
+                    "street_type": "residential",
+                },
+            })
 
     collection = {
         "type": "FeatureCollection",

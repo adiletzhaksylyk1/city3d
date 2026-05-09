@@ -55,34 +55,26 @@ def _building_type_for_height(height: float) -> str:
         return random.choices(["office", "residential", "public"], weights=[6, 3, 1])[0]
 
 
-def _generate_building_attrs(lod_config: LODConfig, height: float) -> Dict:
-    data: Dict = {"lod_level": lod_config.lod_level}
-
-    if lod_config.use_height:
-        data["height"] = f"{height:.1f}m"
-
-    if lod_config.use_levels:
-        data["building:levels"] = max(1, round(height / 3.0))
+def _generate_building_attrs(height: float) -> Dict:
+    data: Dict = {}
+    data["height"] = f"{height:.1f}m"
+    data["building:levels"] = max(1, round(height / 3.0))
 
     material = _material_for_height(height)
     building_type = _building_type_for_height(height)
 
-    if lod_config.use_materials:
-        data["building:material"] = material
+    data["building:material"] = material
+    data["building:colour"] = random.choice(_COLORS.get(material, ["#CCCCCC"]))
 
-    if lod_config.use_colors:
-        data["building:colour"] = random.choice(_COLORS.get(material, ["#CCCCCC"]))
-
-    if lod_config.use_roof_shapes:
-        if height < 8:
-            data["roof:shape"] = random.choices(
-                ["gabled", "hipped", "flat"], weights=[4, 3, 3]
-            )[0]
-        else:
-            data["roof:shape"] = random.choices(
-                ["flat", "gabled", "pyramidal"], weights=[6, 2, 2]
-            )[0]
-        data["roof:height"] = round(random.uniform(1.0, min(5.0, height * 0.15)), 1)
+    if height < 8:
+        data["roof:shape"] = random.choices(
+            ["gabled", "hipped", "flat"], weights=[4, 3, 3]
+        )[0]
+    else:
+        data["roof:shape"] = random.choices(
+            ["flat", "gabled", "pyramidal"], weights=[6, 2, 2]
+        )[0]
+    data["roof:height"] = round(random.uniform(1.0, min(5.0, height * 0.15)), 1)
 
     data["building:type"] = building_type
     return data
@@ -104,7 +96,6 @@ def _make_rotated_rect(cx: float, cy: float, w: float, d: float, angle: float) -
 def _generate_buildings(
     center: np.ndarray,
     radius: float,
-    lod_config: LODConfig,
     n_buildings: int,
     height_mu: float,
     height_sigma: float,
@@ -138,7 +129,7 @@ def _generate_buildings(
 
         height = _sample_height(height_mu, height_sigma)
         polys.append(poly)
-        attrs.append(_generate_building_attrs(lod_config, height))
+        attrs.append(_generate_building_attrs(height))
 
     return polys, attrs
 
@@ -185,7 +176,6 @@ def generate_synthetic_city(
     polys, attrs = _generate_buildings(
         center=center,
         radius=cfg.radius,
-        lod_config=lod_config,
         n_buildings=cfg.n_buildings,
         height_mu=cfg.height_mu,
         height_sigma=cfg.height_sigma,

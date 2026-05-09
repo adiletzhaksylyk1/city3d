@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 
-from config import GeneratorConfig
+from config import GeneratorConfig, LODConfig
 from city_generator import generate_synthetic_city
 from building_processing import generate_footprints, filter_by_lod
 from mesh_builder import extrude_buildings
@@ -60,14 +60,14 @@ def main() -> None:
     print(f"  {cfg.lod_config}")
     print("=" * 60)
 
-    buildings, streets, lod_config = generate_synthetic_city(cfg)
+    buildings, streets, _ = generate_synthetic_city(cfg)
 
     footprints, data = generate_footprints(buildings)
     footprints, data = filter_by_lod(footprints, data, min_area=10.0)
     print(f"[main] Footprints ready: {len(footprints)}")
 
-    mesh        = extrude_buildings(footprints, data, lod_config)
-    street_mesh = create_street_mesh(streets, lod_config)
+    mesh        = extrude_buildings(footprints, data, cfg.lod_config)
+    street_mesh = create_street_mesh(streets, cfg.lod_config)
     print(f"[main] Mesh: {mesh.n_cells} cells, {mesh.n_points} points")
 
     # GeoJSON export (reproject to WGS84 for browser consumption)
@@ -75,20 +75,21 @@ def main() -> None:
         from db_writer import _reproject_buildings, _reproject_lines
         buildings_wgs = _reproject_buildings(buildings)
         streets_wgs   = _reproject_lines(streets)
-        export_geojson(buildings_wgs, streets_wgs, args.geojson, lod_config)
+        lod_configs = [LODConfig(i) for i in range(5)]
+        export_geojson(buildings_wgs, streets_wgs, args.geojson, lod_configs)
     except Exception as e:
         print(f"[main] GeoJSON export failed: {e}")
 
     # Database write (unless --no-db)
     if not args.no_db:
         from db_writer import write_city_to_db
-        write_city_to_db(cfg, buildings, streets, lod_config)
+        write_city_to_db(cfg, buildings, streets, [LODConfig(i) for i in range(5)])
 
     if not args.no_viewer or args.screenshot:
         visualize_mesh(
             mesh        = mesh,
             location    = cfg.location,
-            lod_config  = lod_config,
+            lod_config  = cfg.lod_config,
             street_mesh = street_mesh,
             screenshot  = args.screenshot,
             off_screen  = bool(args.screenshot),

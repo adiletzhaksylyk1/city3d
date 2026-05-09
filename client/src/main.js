@@ -77,6 +77,7 @@ const btnApi      = document.getElementById("btn-api");
 let buildingCount = 0;
 let streetCount   = 0;
 let isLoading     = false;
+let refreshPending = false;
 
 // FPS tracking
 let fpsFrames = 0, fpsLast = performance.now(), fps = 0;
@@ -149,17 +150,30 @@ async function loadCity() {
 }
 
 async function refreshCity() {
-  if (isLoading) return;
+  if (isLoading) {
+    refreshPending = true;
+    return;
+  }
   isLoading = true;
+  refreshPending = false;
 
   try {
     const bbox    = cameraToBbox(camera, 0.08);  // 0.08° ≈ ~8 km at city scale
     const bboxStr = bboxToString(bbox);
 
+    const currentMode = btnApi.classList.contains("active") ? "api" : "geojson";
+    const currentLod = lodSelect.value;
+
     const [buildingsGJ, streetsGJ] = await Promise.all([
       fetchBuildings(bboxStr),
       fetchStreets(bboxStr),
     ]);
+
+    // Check if mode/filter changed while fetching
+    const newMode = btnApi.classList.contains("active") ? "api" : "geojson";
+    if (currentMode !== newMode || currentLod !== lodSelect.value) {
+      return; // Skip rendering, a new refresh is already pending
+    }
 
     const { count: bc } = renderBuildings(buildingsGJ, scene);
     const { count: sc } = renderStreets(streetsGJ, scene);
@@ -172,6 +186,9 @@ async function refreshCity() {
 
   } finally {
     isLoading = false;
+    if (refreshPending) {
+      refreshCity().catch(console.error);
+    }
   }
 }
 
