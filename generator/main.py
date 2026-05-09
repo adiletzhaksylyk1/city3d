@@ -27,6 +27,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--screenshot",  default=None,              help="Save screenshot PNG")
     p.add_argument("--geojson",     default="../client/public/city.geojson",
                    help="Path for GeoJSON export")
+    p.add_argument("--osm-file",    default=None,              help="Path to a real OpenStreetMap XML file (.osm) to parse")
 
     p.add_argument("--db-host",     default="localhost")
     p.add_argument("--db-port",     type=int, default=5432)
@@ -60,7 +61,14 @@ def main() -> None:
     print(f"  {cfg.lod_config}")
     print("=" * 60)
 
-    buildings, streets, _ = generate_synthetic_city(cfg)
+    if args.osm_file:
+        from osm_parser import load_osm_city
+        buildings, streets = load_osm_city(args.osm_file)
+        print("=" * 60)
+        print(f"  Real OSM City Loaded: {args.osm_file}")
+        print("=" * 60)
+    else:
+        buildings, streets, _ = generate_synthetic_city(cfg)
 
     footprints, data = generate_footprints(buildings)
     footprints, data = filter_by_lod(footprints, data, min_area=10.0)

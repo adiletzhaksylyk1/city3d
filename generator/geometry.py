@@ -30,10 +30,13 @@ def get_building_height(
 
     height: float | None = None
 
+    import math
     if lod_config.use_height and data.get("height"):
         try:
             raw = str(data["height"]).lower().replace("m", "").strip()
             height = float(raw)
+            if math.isnan(height) or math.isinf(height):
+                height = None
         except (ValueError, TypeError):
             height = None
 
@@ -42,6 +45,8 @@ def get_building_height(
         if levels is not None:
             try:
                 height = float(levels) * 3.0
+                if math.isnan(height) or math.isinf(height):
+                    height = None
             except (ValueError, TypeError):
                 height = None
 
@@ -52,7 +57,7 @@ def get_building_height(
         else:
             height = default
 
-    return max(height, 1.0)
+    return min(max(height, 1.0), 10000.0)
 
 
 _NAMED_COLORS: Dict[str, Tuple[float, float, float]] = {

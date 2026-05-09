@@ -109,10 +109,19 @@ def export_geojson(
                 props["roof:shape"] = "flat"
                 props["roof:height"] = 0.0
 
+            import math
+            clean_props = {}
+            for k, v in props.items():
+                if v is None:
+                    continue
+                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                    continue
+                clean_props[k] = v
+
             features.append({
                 "type": "Feature",
                 "geometry": mapping(geom),
-                "properties": props,
+                "properties": clean_props,
             })
 
     # Add streets if any config requires it (LOD >= 4)
