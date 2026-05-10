@@ -58,6 +58,14 @@ export function createControls(camera, renderer) {
   controls.maxDistance    = 8_000;
   controls.maxPolarAngle  = Math.PI / 2 - 0.02;   // don't go below ground
   controls.target.set(0, 0, 0);
+
+  // Left-click → pan (map drag), right-click → orbit, middle → dolly
+  controls.mouseButtons = {
+    LEFT:   THREE.MOUSE.PAN,
+    MIDDLE: THREE.MOUSE.DOLLY,
+    RIGHT:  THREE.MOUSE.ROTATE,
+  };
+
   controls.update();
 
   return controls;

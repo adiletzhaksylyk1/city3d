@@ -51,32 +51,32 @@ import {
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
-const container  = document.getElementById("canvas-container");
-const loading    = document.getElementById("loading");
+const container = document.getElementById("canvas-container");
+const loading = document.getElementById("loading");
 const loadingMsg = document.getElementById("loading-msg");
 
 const statBuildings = document.getElementById("stat-buildings");
-const statStreets   = document.getElementById("stat-streets");
-const statFps       = document.getElementById("stat-fps");
-const statLod       = document.getElementById("stat-lod");
+const statStreets = document.getElementById("stat-streets");
+const statFps = document.getElementById("stat-fps");
+const statLod = document.getElementById("stat-lod");
 
-const infoPanel    = document.getElementById("info-panel");
-const infoHeight   = document.getElementById("info-height");
-const infoFloors   = document.getElementById("info-floors");
+const infoPanel = document.getElementById("info-panel");
+const infoHeight = document.getElementById("info-height");
+const infoFloors = document.getElementById("info-floors");
 const infoMaterial = document.getElementById("info-material");
-const infoType     = document.getElementById("info-type");
-const infoRoof     = document.getElementById("info-roof");
-const infoLod      = document.getElementById("info-lod");
+const infoType = document.getElementById("info-type");
+const infoRoof = document.getElementById("info-roof");
+const infoLod = document.getElementById("info-lod");
 
-const lodSelect   = document.getElementById("lod-select");
-const btnGeojson  = document.getElementById("btn-geojson");
-const btnApi      = document.getElementById("btn-api");
+const lodSelect = document.getElementById("lod-select");
+const btnGeojson = document.getElementById("btn-geojson");
+const btnApi = document.getElementById("btn-api");
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
 let buildingCount = 0;
-let streetCount   = 0;
-let isLoading     = false;
+let streetCount = 0;
+let isLoading = false;
 let refreshPending = false;
 
 // FPS tracking
@@ -91,34 +91,47 @@ function hideLoading() {
 
 // ── Scene setup ───────────────────────────────────────────────────────────────
 
-const scene    = createScene();
+const scene = createScene();
 const renderer = createRenderer(container);
-const camera   = createCamera(container);
+const camera = createCamera(container);
 const controls = createControls(camera, renderer);
 
 createLights(scene);
 createGround(scene);
 
 // ── Raycasting ────────────────────────────────────────────────────────────────
+// Only pick a building on a stationary click (not after a drag/pan).
 
 const raycaster = new THREE.Raycaster();
-const pointer   = new THREE.Vector2();
+const pointer = new THREE.Vector2();
 
-renderer.domElement.addEventListener("click", (e) => {
+let _downX = 0, _downY = 0;
+
+renderer.domElement.addEventListener("mousedown", (e) => {
+  _downX = e.clientX;
+  _downY = e.clientY;
+});
+
+renderer.domElement.addEventListener("mouseup", (e) => {
+  // Treat as a click only if pointer barely moved (< 5 px)
+  const dx = e.clientX - _downX;
+  const dy = e.clientY - _downY;
+  if (Math.sqrt(dx * dx + dy * dy) > 5) return;
+
   const rect = renderer.domElement.getBoundingClientRect();
-  pointer.x = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
   raycaster.setFromCamera(pointer, camera);
   const props = pickBuilding(raycaster, scene);
 
   if (props) {
-    infoHeight.textContent   = props.height   ? `${props.height} m`   : "—";
-    infoFloors.textContent   = props.floors   ?? "—";
+    infoHeight.textContent = props.height ? `${props.height} m` : "—";
+    infoFloors.textContent = props.floors ?? "—";
     infoMaterial.textContent = props.material ?? props["building:material"] ?? "—";
-    infoType.textContent     = props.building_type ?? "—";
-    infoRoof.textContent     = props.roof_shape    ?? "—";
-    infoLod.textContent      = props.lod_level     ?? "—";
+    infoType.textContent = props.building_type ?? "—";
+    infoRoof.textContent = props.roof_shape ?? "—";
+    infoLod.textContent = props.lod_level ?? "—";
     infoPanel.classList.add("visible");
   } else {
     infoPanel.classList.remove("visible");
@@ -158,7 +171,7 @@ async function refreshCity() {
   refreshPending = false;
 
   try {
-    const bbox    = cameraToBbox(camera, 0.08);  // 0.08° ≈ ~8 km at city scale
+    const bbox = cameraToBbox(camera, 0.08);  // 0.08° ≈ ~8 km at city scale
     const bboxStr = bboxToString(bbox);
 
     const currentMode = btnApi.classList.contains("active") ? "api" : "geojson";
@@ -179,10 +192,10 @@ async function refreshCity() {
     const { count: sc } = renderStreets(streetsGJ, scene);
 
     buildingCount = bc;
-    streetCount   = sc;
+    streetCount = sc;
 
     statBuildings.textContent = bc;
-    statStreets.textContent   = sc;
+    statStreets.textContent = sc;
 
   } finally {
     isLoading = false;
@@ -227,7 +240,7 @@ function animate() {
   const now = performance.now();
   if (now - fpsLast >= 500) {
     fps = Math.round(fpsFrames * 1000 / (now - fpsLast));
-    fpsLast  = now;
+    fpsLast = now;
     fpsFrames = 0;
     statFps.textContent = fps;
   }
