@@ -93,12 +93,12 @@ def load_osm_city(osm_file: str) -> Tuple[gpd.GeoDataFrame, List[LineString]]:
     else:
         buildings = gpd.GeoDataFrame(attrs, geometry=polygons, crs="EPSG:4326")
     
-    # Project to the generator's internal CRS (EPSG:2154) so the pipeline works seamlessly
-    buildings = buildings.to_crs("EPSG:2154")
+    # Project to the generator's internal CRS (EPSG:3857) so the pipeline works seamlessly
+    buildings = buildings.to_crs("EPSG:3857")
     
     if streets:
         streets_gdf = gpd.GeoDataFrame(geometry=streets, crs="EPSG:4326")
-        streets_gdf = streets_gdf.to_crs("EPSG:2154")
+        streets_gdf = streets_gdf.to_crs("EPSG:3857")
         streets = list(streets_gdf.geometry)
     else:
         streets = []

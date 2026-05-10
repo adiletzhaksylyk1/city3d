@@ -94,8 +94,11 @@ function ringToShape(ring) {
   for (let i = 0; i < ring.length; i++) {
     const [lon, lat] = ring[i];
     const { x, z } = lonLatToScene(lon, lat);
-    if (i === 0) shape.moveTo(x, z);
-    else         shape.lineTo(x, z);
+    // Use -z because ExtrudeGeometry extrudes along the positive Z axis.
+    // When we later rotate the mesh -90 deg around X, the Shape's Y becomes the Scene's Z.
+    // Since Scene Z is -Latitude (North is negative), we must invert it here.
+    if (i === 0) shape.moveTo(x, -z);
+    else         shape.lineTo(x, -z);
   }
   shape.autoClose = true;
   return shape;

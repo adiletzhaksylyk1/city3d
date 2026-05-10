@@ -184,7 +184,7 @@ def generate_synthetic_city(
 
     print(f"[generator] Placed {len(polys)} buildings")
 
-    buildings = gpd.GeoDataFrame(attrs, geometry=polys, crs="EPSG:2154")
+    buildings = gpd.GeoDataFrame(attrs, geometry=polys, crs="EPSG:3857")
 
     streets = _generate_streets(
         center=center,

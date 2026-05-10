@@ -32,7 +32,7 @@ def _reproject_buildings(
 
 def _reproject_lines(
     lines: List[LineString],
-    source_crs: str = "EPSG:2154",
+    source_crs: str = "EPSG:3857",
     target_crs: str = "EPSG:4326",
 ) -> List[LineString]:
     if not lines:
