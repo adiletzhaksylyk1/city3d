@@ -4,8 +4,10 @@
  * renderBuildings():
  *   • Parses GeoJSON Polygon features
  *   • Converts lon/lat rings → Three.js Shape
- *   • Extrudes using THREE.ExtrudeGeometry (height from properties)
- *   • Batches by material+colour → merged BufferGeometry per batch
+ *   • Creates two render LOD meshes per batch:
+ *       LOD 2 — full ExtrudeGeometry (near/mid camera)
+ *       LOD 0 — flat ShapeGeometry footprint (far camera)
+ *   • Batches by (lod × material × colour) → merged BufferGeometry
  *   • Returns a THREE.Group
  *
  * renderStreets():
@@ -32,12 +34,12 @@ function parseColor(colorStr, fallback = "#9E9E9E") {
 
 /** Material-based fallback colours (match geometry.py _MATERIAL_COLORS) */
 const MATERIAL_COLORS = {
-  brick:    "#C8A882",
+  brick: "#C8A882",
   concrete: "#9E9E9E",
-  glass:    "#B3E5FC",
-  wood:     "#8D6E63",
-  stone:    "#90A4AE",
-  plaster:  "#F5F5F5",
+  glass: "#B3E5FC",
+  wood: "#8D6E63",
+  stone: "#90A4AE",
+  plaster: "#F5F5F5",
 };
 
 function resolveColor(props) {
@@ -98,10 +100,30 @@ function ringToShape(ring) {
     // When we later rotate the mesh -90 deg around X, the Shape's Y becomes the Scene's Z.
     // Since Scene Z is -Latitude (North is negative), we must invert it here.
     if (i === 0) shape.moveTo(x, -z);
-    else         shape.lineTo(x, -z);
+    else shape.lineTo(x, -z);
   }
   shape.autoClose = true;
   return shape;
+}
+
+/**
+ * Build a flat footprint from the exact polygon ring.
+ * Used for LOD 0 (far-camera view): renders the true building outline
+ * as a flat shape lying on the ground — no height at all.
+ *
+ * Uses THREE.ShapeGeometry (2-D, no extrusion) so it is the cheapest
+ * possible representation of a building footprint.
+ *
+ * @param {Array<[number, number]>} ring  [[lon, lat], ...]
+ * @returns {THREE.BufferGeometry}
+ */
+function ringToFlatFootprint(ring) {
+  const shape = ringToShape(ring);
+  // ShapeGeometry is purely 2-D (the XY plane of the Shape coordinate space).
+  // After the -90° X rotation it lies flat on the ground (Y = 0).
+  const geo = new THREE.ShapeGeometry(shape);
+  geo.rotateX(-Math.PI / 2);
+  return geo;
 }
 
 /**
@@ -131,7 +153,7 @@ const EXTRUDE_SETTINGS_BASE = {
  *
  * @param {object}       featureCollection  GeoJSON FeatureCollection
  * @param {THREE.Scene}  scene
- * @returns {{ group: THREE.Group, count: number, centres: THREE.Vector3[] }}
+ * @returns {{ group: THREE.Group, count: number }}
  */
 export function renderBuildings(featureCollection, scene) {
   // Remove old buildings group if present
@@ -147,52 +169,54 @@ export function renderBuildings(featureCollection, scene) {
   }
 
   const group = new THREE.Group();
-  group.name  = "buildings";
+  group.name = "buildings";
 
   /** @type {Map<string, { geos: THREE.BufferGeometry[], color: THREE.Color, isGlass: boolean, lodLevel: number, features: object[] }>} */
   const batches = new Map();
-  const centres = [];
 
   let count = 0;
 
   for (const feature of featureCollection.features || []) {
-    const geom  = feature.geometry;
+    const geom = feature.geometry;
     const props = feature.properties || {};
 
     if (!geom || geom.type !== "Polygon") continue;
 
-    const ring   = geom.coordinates[0];
+    const ring = geom.coordinates[0];
     const height = resolveHeight(props);
-    const color  = resolveColor(props);
+    const color = resolveColor(props);
     const isGlass = (props.material === "glass" && height > 30);
+    const matKey = `${isGlass ? "glass" : "solid"}:${color.getHexString()}`;
 
+    // ── LOD 2 — full ExtrudeGeometry (shown when camera is close) ──────────
     const shape = ringToShape(ring);
     const extrudeSettings = { ...EXTRUDE_SETTINGS_BASE, depth: height };
-    const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    const geoFull = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    geoFull.rotateX(-Math.PI / 2);
 
-    // Three.js extrudes along Z; rotate so buildings go up the Y axis
-    geo.rotateX(-Math.PI / 2);
-
-    const lodLevel = props.lod_level !== undefined ? props.lod_level : 2;
-    // Batch key
-    const key = `LOD${lodLevel}:${isGlass ? "glass" : "solid"}:${color.getHexString()}`;
-    if (!batches.has(key)) {
-      batches.set(key, { geos: [], color, isGlass, lodLevel, features: [] });
+    const keyFull = `LOD2:${matKey}`;
+    if (!batches.has(keyFull)) {
+      batches.set(keyFull, { geos: [], color, isGlass, lodLevel: 2, features: [] });
     }
-    const batch = batches.get(key);
-    batch.geos.push(geo);
-    batch.features.push(feature);
+    const batchFull = batches.get(keyFull);
+    batchFull.geos.push(geoFull);
+    batchFull.features.push(feature);
 
-    // Record building centre for LOD / raycasting
-    geo.computeBoundingBox();
-    const centre = new THREE.Vector3();
-    geo.boundingBox.getCenter(centre);
-    centres.push(centre);
+    // ── LOD 0 — flat footprint, exact polygon shape, zero height ───────────
+    const geoFlat = ringToFlatFootprint(ring);
+    const keyFlat = `LOD0:${matKey}`;
+    if (!batches.has(keyFlat)) {
+      batches.set(keyFlat, { geos: [], color, isGlass, lodLevel: 0, features: [] });
+    }
+    const batchFlat = batches.get(keyFlat);
+    batchFlat.geos.push(geoFlat);
+    batchFlat.features.push(feature);
 
     count++;
   }
 
-  // Merge each batch into a single mesh
+  // Merge each batch into a single mesh.
+  // LOD 0 meshes start hidden; applySceneLOD toggles visibility each frame.
   for (const [, { geos, color, isGlass, lodLevel, features }] of batches) {
     if (!geos.length) continue;
 
@@ -200,34 +224,37 @@ export function renderBuildings(featureCollection, scene) {
       ? BufferGeometryUtils.mergeGeometries(geos, false)
       : geos[0];
 
-    const mat  = getMaterial(color, isGlass ? "glass" : "building");
+    const mat = getMaterial(color, isGlass ? "glass" : "building");
     const mesh = new THREE.Mesh(merged, mat);
-    mesh.castShadow    = true;
+    mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.name = "building-batch";
 
-    // Store only this batch's features for raycasting (not the entire collection)
+    // LOD 0 (far/simplified) starts hidden; LOD 2 (near/full) starts visible.
+    // applySceneLOD() will correct this on the very first frame.
+    mesh.visible = (lodLevel === 2);
+
     mesh.userData.features = features;
     mesh.userData.lodLevel = lodLevel;
 
     group.add(mesh);
 
-    // Dispose individual geos after merge
+    // Dispose individual geometries after merge
     if (geos.length > 1) geos.forEach((g) => g.dispose());
   }
 
   scene.add(group);
   console.log(`[renderer] Buildings: ${count} features → ${batches.size} draw calls`);
 
-  return { group, count, centres };
+  return { group, count };
 }
 
 // ── Street rendering (Section 5.5.3) ─────────────────────────────────────────
 
 /** Street type → THREE.Color (matches thesis Table / Listing 5.3) */
 const STREET_COLORS = {
-  highway:     new THREE.Color(0xFFCC00),   // amber
-  arterial:    new THREE.Color(0x666666),   // dark grey
+  highway: new THREE.Color(0xFFCC00),   // amber
+  arterial: new THREE.Color(0x666666),   // dark grey
   residential: new THREE.Color(0xAAAAAA),   // light grey
 };
 
@@ -261,11 +288,11 @@ export function renderStreets(featureCollection, scene) {
   }
 
   const group = new THREE.Group();
-  group.name  = "streets";
-  let count   = 0;
+  group.name = "streets";
+  let count = 0;
 
   for (const feature of featureCollection.features || []) {
-    const geom  = feature.geometry;
+    const geom = feature.geometry;
     const props = feature.properties || {};
 
     if (!geom || geom.type !== "LineString") continue;
@@ -280,10 +307,10 @@ export function renderStreets(featureCollection, scene) {
 
     if (points.length < 2) continue;
 
-    const geo  = new THREE.BufferGeometry().setFromPoints(points);
-    const mat  = getStreetMaterial(color);
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = getStreetMaterial(color);
     const line = new THREE.Line(geo, mat);
-    line.name  = "street";
+    line.name = "street";
 
     group.add(line);
     count++;
@@ -310,7 +337,8 @@ export function pickBuilding(raycaster, scene) {
   if (!buildingGroup) return null;
 
   const meshes = [];
-  buildingGroup.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  // Only test visible meshes — hidden LOD tiers must not intercept clicks.
+  buildingGroup.traverse((o) => { if (o.isMesh && o.visible) meshes.push(o); });
 
   const hits = raycaster.intersectObjects(meshes, false);
   if (!hits.length) return null;
@@ -325,7 +353,7 @@ export function pickBuilding(raycaster, scene) {
   for (const f of features) {
     if (!f.geometry || f.geometry.type !== "Polygon") continue;
     const [lon, lat] = f.geometry.coordinates[0][0];
-    const { x, z }  = lonLatToScene(lon, lat);
+    const { x, z } = lonLatToScene(lon, lat);
     const d = hit.point.distanceTo(new THREE.Vector3(x, hit.point.y, z));
     if (d < bestDist) { bestDist = d; best = f; }
   }

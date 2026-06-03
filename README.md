@@ -72,7 +72,7 @@ cd generator
 pip install -r requirements.txt
 python main.py
 
-python main.py --osm-file ../data/osm/map.osm --no-viewer for osm
+python main.py --osm-file ../data/osm/map.osm --no-viewer     for osm
 ```
 
 ### 4. Start the API

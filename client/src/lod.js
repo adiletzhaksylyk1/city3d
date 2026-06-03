@@ -1,15 +1,13 @@
 /**
  * lod.js — Client-side Level-of-Detail management (Section 5.6, Table 5.1).
  *
- * LOD tier assignment is based on camera distance from each building's
- * projected centre. Three tiers are implemented:
+ * LOD tier assignment is based on camera distance from the orbit-controls target.
+ * Two render geometries are used:
  *
- *   LOD 0 – Near  (0–200 m)   Full extrusion, shadows enabled
- *   LOD 1 – Mid   (200–600 m) Simplified, receive-shadow only
- *   LOD 2 – Far   (600+ m)    No shadows (performance optimisation)
+ *   LOD 2 – Near/Mid  (0–750 units)   Full ExtrudeGeometry, shadows based on tier
+ *   LOD 0 – Far       (750+ units)    Flat ShapeGeometry footprint, no shadows
  *
- * The LOD manager controls shadow quality on the merged building mesh
- * based on camera distance from the scene target (controls.target).
+ * Shadow quality is also degraded as the camera moves farther away.
  */
 
 import * as THREE from "three";
@@ -18,8 +16,8 @@ export const LOD_NEAR = 0;
 export const LOD_MID  = 1;
 export const LOD_FAR  = 2;
 
-export const LOD_NEAR_DIST = 200;
-export const LOD_MID_DIST  = 600;
+export const LOD_NEAR_DIST = 350;   // scene units — full detail + shadows
+export const LOD_MID_DIST  = 750;   // scene units — full detail, no shadows
 
 /**
  * Compute the LOD tier for a given camera-to-point distance.
@@ -59,11 +57,11 @@ export function applySceneLOD(buildingMesh, camera, target) {
 
   const tier = computeSceneTier(camera, target);
 
-  // Map tier to the target data LOD level
-  let targetDataLod = 2; // Default to standard
-  if (tier === LOD_NEAR) targetDataLod = 4;
-  else if (tier === LOD_MID) targetDataLod = 2;
-  else if (tier === LOD_FAR) targetDataLod = 0;
+  // Map camera-distance tier → render LOD level.
+  // LOD 2 = full ExtrudeGeometry (near + mid); LOD 0 = flat footprint (far).
+  let targetDataLod;
+  if (tier === LOD_FAR) targetDataLod = 0;   // flat footprints
+  else                  targetDataLod = 2;   // full extrusion
 
   // We need to find the available LOD levels in the mesh
   const availableLods = new Set();
@@ -88,28 +86,22 @@ export function applySceneLOD(buildingMesh, camera, target) {
     }
   }
 
-  // Adjust visibility and shadows
-  if (buildingMesh.isGroup) {
-    buildingMesh.traverse((child) => {
-      if (child.isMesh) {
-        // Toggle visibility based on activeDataLod
-        if (child.userData.lodLevel !== undefined) {
-          child.visible = (child.userData.lodLevel === activeDataLod);
-        } else {
-          child.visible = true; // no lodLevel -> always visible
-        }
-
-        // Only adjust shadows for visible meshes to save performance
-        if (child.visible) {
-          child.castShadow    = tier === LOD_NEAR;
-          child.receiveShadow = tier <= LOD_MID;
-        }
+  // buildingMesh is always a THREE.Group (created by renderBuildings)
+  buildingMesh.traverse((child) => {
+    if (child.isMesh) {
+      if (child.userData.lodLevel !== undefined) {
+        child.visible = (child.userData.lodLevel === activeDataLod);
+      } else {
+        child.visible = true; // no lodLevel → always visible
       }
-    });
-  } else {
-    buildingMesh.castShadow    = tier === LOD_NEAR;
-    buildingMesh.receiveShadow = tier <= LOD_MID;
-  }
+
+      // Adjust shadows only for visible meshes
+      if (child.visible) {
+        child.castShadow    = tier === LOD_NEAR;
+        child.receiveShadow = tier <= LOD_MID;
+      }
+    }
+  });
 
   // Debug logging for LOD selection changes
   if (buildingMesh.userData._lastActiveLod !== activeDataLod) {
@@ -121,7 +113,7 @@ export function applySceneLOD(buildingMesh, camera, target) {
 }
 
 export const LOD_TIER_LABELS = {
-  [LOD_NEAR]: "Near (full detail)",
-  [LOD_MID]:  "Mid  (simplified)",
-  [LOD_FAR]:  "Far  (flat)",
+  [LOD_NEAR]: "Near (full detail + shadows)",
+  [LOD_MID]:  "Mid  (full detail)",
+  [LOD_FAR]:  "Far  (flat footprints)",
 };
