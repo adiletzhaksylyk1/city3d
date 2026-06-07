@@ -4,3 +4,4 @@ geopandas>=0.14
 pyvista>=0.43
 psycopg2-binary>=2.9
 pyproj>=3.5
+osmnx>=1.9

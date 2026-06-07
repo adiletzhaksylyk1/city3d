@@ -9,6 +9,7 @@ from building_processing import generate_footprints, filter_by_lod
 from mesh_builder import extrude_buildings
 from streets import create_street_mesh
 from visualization import visualize_mesh, export_geojson
+from shapely import affinity
 
 
 def parse_args() -> argparse.Namespace:
@@ -27,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--screenshot",  default=None,              help="Save screenshot PNG")
     p.add_argument("--geojson",     default="../client/public/city.geojson",
                    help="Path for GeoJSON export")
+    p.add_argument("--osm-place", default=None, help="OSM place name, e.g. 'Astana, Kazakhstan'")
     p.add_argument("--osm-file",    default=None,              help="Path to a real OpenStreetMap XML file (.osm) to parse")
 
     p.add_argument("--db-host",     default="localhost")
@@ -37,6 +39,24 @@ def parse_args() -> argparse.Namespace:
 
     return p.parse_args()
 
+def center_geometries_for_viewer(buildings, streets):
+    from shapely import affinity
+
+    bounds = buildings.total_bounds
+    cx = (bounds[0] + bounds[2]) / 2
+    cy = (bounds[1] + bounds[3]) / 2
+
+    buildings_local = buildings.copy()
+    buildings_local["geometry"] = buildings_local.geometry.apply(
+        lambda g: affinity.translate(g, xoff=-cx, yoff=-cy)
+    )
+
+    streets_local = [
+        affinity.translate(s, xoff=-cx, yoff=-cy)
+        for s in streets
+    ]
+
+    return buildings_local, streets_local
 
 def main() -> None:
     args = parse_args()
@@ -61,7 +81,13 @@ def main() -> None:
     print(f"  {cfg.lod_config}")
     print("=" * 60)
 
-    if args.osm_file:
+    if args.osm_place:
+        from osm_parser import load_osm_place
+        buildings, streets = load_osm_place(args.osm_place)
+        print("=" * 60)
+        print(f"  Real OSM City Loaded: {args.osm_place}")
+        print("=" * 60)
+    elif args.osm_file:
         from osm_parser import load_osm_city
         buildings, streets = load_osm_city(args.osm_file)
         print("=" * 60)
@@ -70,12 +96,18 @@ def main() -> None:
     else:
         buildings, streets, _ = generate_synthetic_city(cfg)
 
-    footprints, data = generate_footprints(buildings)
+    viewer_buildings = buildings
+    viewer_streets = streets
+
+    if args.osm_place or args.osm_file:
+        viewer_buildings, viewer_streets = center_geometries_for_viewer(buildings, streets)
+
+    footprints, data = generate_footprints(viewer_buildings)
     footprints, data = filter_by_lod(footprints, data, min_area=10.0)
     print(f"[main] Footprints ready: {len(footprints)}")
 
     mesh        = extrude_buildings(footprints, data, cfg.lod_config)
-    street_mesh = create_street_mesh(streets, cfg.lod_config)
+    street_mesh = create_street_mesh(viewer_streets, cfg.lod_config)
     print(f"[main] Mesh: {mesh.n_cells} cells, {mesh.n_points} points")
 
     # GeoJSON export (reproject to WGS84 for browser consumption)
@@ -104,6 +136,7 @@ def main() -> None:
         )
 
     print("[main] Done.")
+
 
 
 if __name__ == "__main__":

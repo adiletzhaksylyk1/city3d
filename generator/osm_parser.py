@@ -104,3 +104,88 @@ def load_osm_city(osm_file: str) -> Tuple[gpd.GeoDataFrame, List[LineString]]:
         streets = []
 
     return buildings, streets
+
+def load_osm_place(place: str) -> Tuple[gpd.GeoDataFrame, List[LineString]]:
+    print(f"[osm_parser] Loading OSM place: {place}")
+
+    try:
+        import osmnx as ox
+        ox.settings.timeout = 180
+        ox.settings.use_cache = True
+        ox.settings.log_console = True
+    except ImportError:
+        print("[osm_parser] osmnx is not installed. Run: pip install osmnx")
+        return gpd.GeoDataFrame(), []
+
+    try:
+        tags = {"building": True}
+        buildings = ox.features_from_place(place, tags)
+
+        if buildings.empty:
+            print("[osm_parser] No buildings found.")
+            buildings_gdf = gpd.GeoDataFrame(columns=["geometry"], geometry=[], crs="EPSG:4326")
+        else:
+            buildings = buildings.reset_index()
+            buildings = buildings[buildings.geometry.type.isin(["Polygon", "MultiPolygon"])]
+
+            attrs = []
+            polygons = []
+
+            for _, row in buildings.iterrows():
+                geom = row.geometry
+                if geom is None or geom.is_empty:
+                    continue
+
+                data = {}
+
+                for key in [
+                    "building",
+                    "building:levels",
+                    "height",
+                    "building:material",
+                    "building:colour",
+                    "roof:shape",
+                    "roof:height",
+                ]:
+                    if key in row and row[key] is not None:
+                        data[key] = row[key]
+
+                building_type = data.get("building", "yes")
+                data["building:type"] = building_type if building_type != "yes" else "residential"
+
+                polygons.append(geom)
+                attrs.append(data)
+
+            buildings_gdf = gpd.GeoDataFrame(attrs, geometry=polygons, crs="EPSG:4326")
+
+        print(f"[osm_parser] Loaded buildings: {len(buildings_gdf)}")
+
+        graph = ox.graph_from_place(place, network_type="drive")
+        _, edges = ox.graph_to_gdfs(graph)
+
+        streets_gdf = edges.reset_index()
+        streets_gdf = streets_gdf[streets_gdf.geometry.notnull()]
+        streets_gdf = streets_gdf[streets_gdf.geometry.type.isin(["LineString", "MultiLineString"])]
+
+        streets = []
+
+        for geom in streets_gdf.geometry:
+            if geom.geom_type == "LineString":
+                streets.append(geom)
+            elif geom.geom_type == "MultiLineString":
+                streets.extend(list(geom.geoms))
+
+        print(f"[osm_parser] Loaded streets: {len(streets)}")
+
+        buildings_gdf = buildings_gdf.to_crs("EPSG:3857")
+
+        if streets:
+            streets_gdf = gpd.GeoDataFrame(geometry=streets, crs="EPSG:4326")
+            streets_gdf = streets_gdf.to_crs("EPSG:3857")
+            streets = list(streets_gdf.geometry)
+
+        return buildings_gdf, streets
+
+    except Exception as e:
+        print(f"[osm_parser] Failed to load OSM place: {e}")
+        return gpd.GeoDataFrame(), []
