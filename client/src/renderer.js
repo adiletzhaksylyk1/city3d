@@ -252,11 +252,30 @@ export function renderBuildings(featureCollection, scene) {
 // ── Street rendering (Section 5.5.3) ─────────────────────────────────────────
 
 /** Street type → THREE.Color (matches thesis Table / Listing 5.3) */
-const STREET_COLORS = {
-  highway: new THREE.Color(0xFFCC00),   // amber
-  arterial: new THREE.Color(0x666666),   // dark grey
-  residential: new THREE.Color(0xAAAAAA),   // light grey
+let CURRENT_RENDER_THEME = "dark";
+
+const STREET_COLORS_BY_THEME = {
+  dark: {
+    highway: new THREE.Color(0xFFCC00),
+    arterial: new THREE.Color(0x666666),
+    residential: new THREE.Color(0xAAAAAA),
+  },
+  light: {
+    highway: new THREE.Color(0xB45309),
+    arterial: new THREE.Color(0x374151),
+    residential: new THREE.Color(0x4B5563),
+  },
 };
+
+export function setRenderTheme(themeName) {
+  CURRENT_RENDER_THEME = themeName;
+  _streetMatCache.clear();
+}
+
+function getStreetColor(streetType) {
+  const colors = STREET_COLORS_BY_THEME[CURRENT_RENDER_THEME] ?? STREET_COLORS_BY_THEME.dark;
+  return colors[streetType] ?? colors.residential;
+}
 
 /** Street material cache — reuse materials across features and refreshes */
 const _streetMatCache = new Map();
@@ -298,7 +317,7 @@ export function renderStreets(featureCollection, scene) {
     if (!geom || geom.type !== "LineString") continue;
 
     const streetType = props.street_type || "residential";
-    const color = STREET_COLORS[streetType] ?? STREET_COLORS.residential;
+    const color = getStreetColor(streetType);
 
     const points = geom.coordinates.map(([lon, lat]) => {
       const { x, z } = lonLatToScene(lon, lat);

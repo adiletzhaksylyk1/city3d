@@ -42,6 +42,7 @@ import {
   renderBuildings,
   renderStreets,
   pickBuilding,
+  setRenderTheme,
 } from "./renderer.js";
 
 import {
@@ -71,6 +72,7 @@ const infoLod = document.getElementById("info-lod");
 const lodSelect = document.getElementById("lod-select");
 const btnGeojson = document.getElementById("btn-geojson");
 const btnApi = document.getElementById("btn-api");
+const btnTheme = document.getElementById("btn-theme");
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -95,9 +97,45 @@ const scene = createScene();
 const renderer = createRenderer(container);
 const camera = createCamera(container);
 const controls = createControls(camera, renderer);
+const lights = createLights(scene);
+const ground = createGround(scene);
 
-createLights(scene);
-createGround(scene);
+// ── Theme setup ───────────────────────────────────────────────────────────────
+
+const THEMES = {
+  dark: {
+    sceneBg: 0x0a0a14,
+    fog: 0x0a0a14,
+    ground: 0x1a1a2e,
+  },
+  light: {
+    sceneBg: 0xdbeafe,
+    fog: 0xdbeafe,
+    ground: 0xcbd5e1,
+  },
+};
+
+let currentTheme = localStorage.getItem("city3d-theme") || "dark";
+
+function applyTheme(name) {
+  const theme = THEMES[name];
+
+  document.documentElement.dataset.theme = name;
+  scene.background.set(theme.sceneBg);
+
+  if (scene.fog) {
+    scene.fog.color.set(theme.fog);
+  }
+
+  ground.material.color.set(theme.ground);
+  ground.material.needsUpdate = true;
+
+  btnTheme.textContent = name === "dark" ? "Dark" : "Light";
+  localStorage.setItem("city3d-theme", name);
+  setRenderTheme(name);
+}
+
+applyTheme(currentTheme);
 
 // ── Raycasting ────────────────────────────────────────────────────────────────
 // Only pick a building on a stationary click (not after a drag/pan).
@@ -271,6 +309,14 @@ btnApi.addEventListener("click", () => {
   setSourceMode("api");
   btnApi.classList.add("active");
   btnGeojson.classList.remove("active");
+  refreshCity().catch(console.error);
+});
+
+// Theme Change
+
+btnTheme.addEventListener("click", () => {
+  currentTheme = currentTheme === "dark" ? "light" : "dark";
+  applyTheme(currentTheme);
   refreshCity().catch(console.error);
 });
 

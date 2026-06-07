@@ -178,6 +178,85 @@
       border-color: #90caf9;
       color: #90caf9;
     }
+    :root {
+      --bg: #0a0a14;
+      --panel-bg: rgba(10, 10, 20, 0.82);
+      --panel-border: rgba(255,255,255,0.10);
+      --text: #e0e0e0;
+      --muted: #b0bec5;
+      --accent: #90caf9;
+    }
+
+    html[data-theme="light"] {
+      --bg: #eef4fb;
+      --panel-bg: rgba(255, 255, 255, 0.86);
+      --panel-border: rgba(15, 23, 42, 0.16);
+      --text: #1e293b;
+      --muted: #475569;
+      --accent: #2563eb;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .hud-panel {
+      background: var(--panel-bg);
+      border-color: var(--panel-border);
+    }
+
+    .hud-title,
+    .loading-title,
+    #info-panel .info-title {
+      color: var(--accent);
+    }
+
+    .hud-stat,
+    #lod-selector label,
+    #info-panel .info-row {
+      color: var(--muted);
+    }
+
+    .hud-stat span,
+    #info-panel .info-row span {
+      color: var(--text);
+    }
+
+    html[data-theme="light"] #loading {
+      background: #eef4fb;
+    }
+
+    html[data-theme="light"] #lod-select {
+      background: rgba(255,255,255,0.9);
+      color: #1e293b;
+      border-color: rgba(15,23,42,0.2);
+    }
+
+    html[data-theme="light"] #info-panel {
+      background: rgba(255,255,255,0.9);
+      border-color: rgba(37,99,235,0.25);
+    }
+    html[data-theme="light"] .src-btn {
+      background: rgba(255,255,255,0.95);
+      color: #334155;
+      border-color: rgba(15,23,42,0.25);
+    }
+
+    html[data-theme="light"] .src-btn.active {
+      background: rgba(37,99,235,0.14);
+      color: #1d4ed8;
+      border-color: #2563eb;
+    }
+
+    html[data-theme="light"] #controls-help {
+      color: #334155;
+    }
+
+    html[data-theme="light"] .loading-sub {
+      color: #475569;
+    }
+
   </style>
 </head>
 <body>
@@ -218,6 +297,10 @@
         <button class="src-btn active" id="btn-geojson">GeoJSON</button>
         <button class="src-btn"        id="btn-api">Live API</button>
       </div>
+    </div>
+    <div id="theme-toggle" style="margin-top:10px;">
+      <div class="hud-stat" style="margin-bottom:4px">Theme:</div>
+      <button class="src-btn" id="btn-theme">Dark</button>
     </div>
   </div>
 
