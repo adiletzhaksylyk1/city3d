@@ -39,20 +39,32 @@ def visualize_mesh(
     if street_mesh is not None and street_mesh.n_cells > 0:
         pl.add_mesh(street_mesh, color="white", line_width=2, render_lines_as_tubes=False)
 
-    radius = 600
+    bounds = mesh.bounds if mesh.n_cells > 0 else (-600, 600, -600, 600, 0, 100)
+
+    xmin, xmax, ymin, ymax, zmin, zmax = bounds
+    cx = (xmin + xmax) / 2
+    cy = (ymin + ymax) / 2
+    cz = (zmin + zmax) / 2
+
+    size_x = xmax - xmin
+    size_y = ymax - ymin
+    radius = max(size_x, size_y, 600)
+
     ground = pv.Plane(
-        center=(0, 0, -0.1),
+        center=(cx, cy, -0.1),
         direction=(0, 0, 1),
-        i_size=radius * 2,
-        j_size=radius * 2,
+        i_size=radius * 1.3,
+        j_size=radius * 1.3,
     )
     pl.add_mesh(ground, color="#1A1A2E", show_edges=False)
 
     pl.camera_position = [
-        (0, -radius * 1.2, radius * 0.8),
-        (0, 0, 0),
+        (cx, cy - radius * 1.2, radius * 0.8),
+        (cx, cy, cz),
         (0, 0, 1),
     ]
+
+    pl.reset_camera()
 
     if screenshot:
         pl.screenshot(screenshot)

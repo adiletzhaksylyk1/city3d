@@ -30,6 +30,8 @@ def parse_args() -> argparse.Namespace:
                    help="Path for GeoJSON export")
     p.add_argument("--osm-place", default=None, help="OSM place name, e.g. 'Astana, Kazakhstan'")
     p.add_argument("--osm-file",    default=None,              help="Path to a real OpenStreetMap XML file (.osm) to parse")
+    p.add_argument("--osm-bbox", nargs=4, type=float, metavar=("SOUTH", "WEST", "NORTH", "EAST"), default=None,
+                   help="OSM bounding box")
 
     p.add_argument("--db-host",     default="localhost")
     p.add_argument("--db-port",     type=int, default=5432)
@@ -81,7 +83,14 @@ def main() -> None:
     print(f"  {cfg.lod_config}")
     print("=" * 60)
 
-    if args.osm_place:
+    if args.osm_bbox:
+        from osm_parser import load_osm_bbox
+        south, west, north, east = args.osm_bbox
+        buildings, streets = load_osm_bbox(south, west, north, east)
+        print("=" * 60)
+        print(f"  Real OSM BBox Loaded: {args.osm_bbox}")
+        print("=" * 60)
+    elif args.osm_place:
         from osm_parser import load_osm_place
         buildings, streets = load_osm_place(args.osm_place)
         print("=" * 60)
