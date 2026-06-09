@@ -1,13 +1,11 @@
 /**
- * lod.js — Client-side Level-of-Detail management (Section 5.6, Table 5.1).
+ * lod.js — Client-side Level-of-Detail management.
  *
  * LOD tier assignment is based on camera distance from the orbit-controls target.
  * Two render geometries are used:
  *
  *   LOD 2 – Near/Mid  (0–750 units)   Full ExtrudeGeometry, shadows based on tier
  *   LOD 0 – Far       (750+ units)    Flat ShapeGeometry footprint, no shadows
- *
- * Shadow quality is also degraded as the camera moves farther away.
  */
 
 import * as THREE from "three";

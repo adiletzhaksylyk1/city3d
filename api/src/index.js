@@ -1,7 +1,7 @@
 /**
  * index.js — Node.js / Express API server entry point.
  *
- * Layer 3 of the 3D city visualisation system (Section 5.4).
+ * Layer 3 of the 3D city visualisation system.
  *
  * Endpoints:
  *   GET /api/buildings?bbox=minLon,minLat,maxLon,maxLat[&lod=0-4]
@@ -32,7 +32,6 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 app.use(cors({
   origin: [
     "http://localhost:5173",   // Vite dev server
-    "http://localhost:4173",   // Vite preview
     "http://localhost:3001",   // alternate client port
   ],
   methods: ["GET"],

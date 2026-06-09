@@ -9,7 +9,6 @@
  *   5. HUD stats, info panel, LOD selector, source toggle (DOM)
  *   6. Raycasting for building click (renderer.js)
  *
- * Section references: 5.5, 5.6, 5.7
  */
 
 import * as THREE from "three";

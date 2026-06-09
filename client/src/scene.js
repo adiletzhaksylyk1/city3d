@@ -1,5 +1,5 @@
 /**
- * scene.js — Three.js scene initialisation (Section 5.5.1).
+ * scene.js — Three.js scene initialisation.
  *
  * Sets up:
  *   - WebGLRenderer  (antialiased, shadow-capable)
@@ -7,7 +7,6 @@
  *   - OrbitControls for mouse interaction
  *   - AmbientLight + DirectionalLight (mid-afternoon sun simulation)
  *   - Ground plane
- *   - Axes helper (dev only)
  */
 
 import * as THREE from "three";
